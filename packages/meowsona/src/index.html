@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0" />
+    <title>Meowsona</title>
+
+    <script type="module" src="/build/meowsona.esm.js"></script>
+    <script nomodule src="/build/meowsona.js"></script>
+  </head>
+  <body>
+    <div class="hero hidden">
+      <h1>Hello, I am Nero.</h1>
+      <h2>Your purrsonal assistant.</h2>
+    </div>
+    <meowsona-head id="head" state="idle" atlas-url="/assets/cat.png" size="480" style="transform-origin: 50% 78%; cursor: pointer"></meowsona-head>
+    <script>
+      // Clockwise from the right, matching atan2 with y pointing down.
+      const CLOCKWISE = ['right', 'down-right', 'down', 'down-left', 'left', 'up-left', 'up', 'up-right'];
+      const SECTOR = (Math.PI * 2) / CLOCKWISE.length;
+      const HYSTERESIS = 0.12;
+      const DEAD_ZONE = 70;
+
+      const PAYOFFS = ['love', 'sparkle', 'awesome'];
+      const BOOP_PAYOFF = 120;
+      const BOOP_END = 560;
+      const SQUASH_MS = 420;
+      const DIZZY_AFTER = 4;
+      const DIZZY_WINDOW = 1600;
+      const DIZZY_END = 1100;
+
+      const SQUASH = [
+        { transform: 'scale(1, 1)', easing: 'ease-in' },
+        { transform: 'scale(1.10, 0.86)', offset: 0.18, easing: 'ease-out' },
+        { transform: 'scale(0.95, 1.08)', offset: 0.45, easing: 'ease-in-out' },
+        { transform: 'scale(1.03, 0.97)', offset: 0.72, easing: 'ease-in-out' },
+        { transform: 'scale(1, 1)' },
+      ];
+
+
+      const head = document.getElementById('head');
+      const wrap = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
+
+      let direction = 'idle';
+      let reaction = null;
+      let sector = -1;
+      let pointer = null;
+      let timers = [];
+      const boops = { count: 0, at: 0 };
+
+      window.onload = () => {
+        setReaction('sleepy')
+        setTimeout(() => setReaction('happy'), 2000)
+        setTimeout(() => setReaction(null), 3000)
+      }
+
+      // The reaction owns the sprite while it lasts; the head keeps aiming underneath.
+      const paint = () => head.setAttribute('state', reaction ?? direction);
+
+      const setDirection = (next) => {
+        if (next !== direction) {
+          direction = next;
+          paint();
+        }
+      };
+
+      const setReaction = (next) => {
+        reaction = next;
+        paint();
+      };
+
+      const aim = () => {
+        if (!pointer) return;
+
+        const box = head.getBoundingClientRect();
+        const dx = pointer.x - (box.left + box.width / 2);
+        const dy = pointer.y - (box.top + box.height / 2);
+
+        if (Math.hypot(dx, dy) < DEAD_ZONE) {
+          sector = -1;
+          setDirection('idle');
+          return;
+        }
+
+        // Hold the current sector until the pointer is well past its edge.
+        const angle = Math.atan2(dy, dx);
+        if (sector !== -1 && Math.abs(wrap(angle - sector * SECTOR)) < SECTOR / 2 + HYSTERESIS) {
+          return;
+        }
+
+        sector = (Math.round(angle / SECTOR) + CLOCKWISE.length) % CLOCKWISE.length;
+        setDirection(CLOCKWISE[sector]);
+      };
+
+      const boop = () => {
+        timers.forEach(clearTimeout);
+        timers = [];
+
+        const later = (ms, next) => timers.push(setTimeout(() => setReaction(next), ms));
+
+        const now = Date.now();
+        boops.count = now - boops.at < DIZZY_WINDOW ? boops.count + 1 : 1;
+        boops.at = now;
+
+        if (boops.count >= DIZZY_AFTER) {
+          boops.count = 0;
+          setReaction('confused');
+          later(DIZZY_END, null);
+        } else {
+          setReaction('smile');
+          later(BOOP_PAYOFF, PAYOFFS[(boops.count - 1) % PAYOFFS.length]);
+          later(BOOP_END, null);
+        }
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        // Per-keyframe easing with the effect itself linear: an easing on the effect
+        // would reinterpret every offset and front-load the whole bounce.
+        head.animate(SQUASH, { duration: SQUASH_MS, easing: 'linear' });
+      };
+
+      head.addEventListener('click', boop);
+
+      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        window.addEventListener(
+          'pointermove',
+          (event) => {
+            pointer = { x: event.clientX, y: event.clientY };
+            aim();
+          },
+          { passive: true },
+        );
+        window.addEventListener('scroll', aim, { passive: true });
+      }
+    </script>
+  </body>
+</html>
+
+<style>
+  @import url(https://fonts.bunny.net/css?family=ibm-plex-sans:400);
+
+  * {
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    display: grid;
+    place-items: center;
+    background: #0e0e0e;
+    color: #fefefe;
+  }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero > h2 {
+    font-weight: lighter;
+    opacity: 70%;
+  }
+
+  @keyframes enter {
+    from {
+      transform: scale(0);
+      opacity: 0;
+    }
+    to {
+      transform: scale(100%);
+      opacity: 1;
+    }
+  }
+
+  #head {
+    opacity: 0;
+    animation: enter .5s cubic-bezier(0.34, 1.56, 0.64, 1) .5s; /* iteration-count direction fill-mode; */
+    animation-fill-mode: forwards;
+
+    margin-top: 10rem;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+</style>
