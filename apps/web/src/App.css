@@ -3,5 +3,39 @@
   place-items: center;
   width: 100%;
   height: 100%;
-  clip-path: inset(-10% 0 53% 0);
+  clip-path: inset(-10% 0 52.5% 0);
+}
+
+.cat-presence {
+  transition: translate 700ms cubic-bezier(.42, 0, .26, 1);
+}
+
+.cat-presence--sleeping {
+  animation: cat-drift 9.3s cubic-bezier(.42, 0, .26, 1) infinite;
+  translate: 0 56px;
+}
+
+.cat-presence--awake {
+  animation: cat-wake 700ms ease-out both, cat-drift 17s cubic-bezier(0.36, 0, 0.66, -0.56) 700ms infinite;
+}
+
+@keyframes cat-wake {
+  0% { transform: translateY(3px) scale(0.98, 0.97); }
+  55% { transform: translateY(-7px) scale(1.03, 1.04); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes cat-drift {
+  0%, 100% { transform: translateY(0); }
+  14% { transform: translateY(-3px); }
+  23% { transform: translateY(-2px); }
+  39% { transform: translateY(2px); }
+  48% { transform: translateY(1px); }
+  66% { transform: translateY(-4px); }
+  74% { transform: translateY(-3px); }
+  91% { transform: translateY(1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-presence { animation: none; transition: none; }
 }

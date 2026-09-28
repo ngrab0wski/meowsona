@@ -78,7 +78,6 @@ function App() {
 
   return (
     <div className="min-h-screen w-full relative bg-muted">
-      {/* Warm Orange Glow Top */}
       <div
         className="absolute inset-0"
         style={{
@@ -96,15 +95,16 @@ function App() {
       />
       <main className="relative flex flex-col gap-20 min-h-svh items-center justify-center p-4 text-foreground">
         <div className="stack">
-          <img width={300} src={boxImg} alt="Cardboard Box" />
+          <img width={320} src={boxImg} alt="Cardboard Box" />
           <div className="box-clip">
-            <Mascot
-              className="mb-16"
-              atlasUrl={catAtlas}
-              size={240}
-              label="cat"
-              emotion={ready ? emotion : "sleepy"}
-            />
+            <div className={`cat-presence mb-32 ${ready ? "cat-presence--awake" : "cat-presence--sleeping"}`}>
+              <Mascot
+                atlasUrl={catAtlas}
+                size={240}
+                label="cat"
+                emotion={ready ? emotion : "sleepy"}
+              />
+            </div>
           </div>
         </div>
         <Card className="w-full max-w-md">
