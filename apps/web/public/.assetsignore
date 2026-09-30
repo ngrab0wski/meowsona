@@ -1,0 +1,4 @@
+# Cloudflare skips these on upload.
+# onnxruntime's bundled wasm (~26 MB) is over the 25 MiB per-file limit and never loaded:
+# Transformers.js points onnxruntime at the jsDelivr CDN at runtime.
+*.wasm
