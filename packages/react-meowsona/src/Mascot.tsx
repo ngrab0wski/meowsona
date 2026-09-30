@@ -39,9 +39,11 @@ export type MascotProps = {
   className?: string
   /** What a screen reader calls it. */
   label?: string
+  /** Expression to hold instead of following the pointer. A boop still wins. */
+  emotion?: State | null
 }
 
-export function Mascot({ atlasUrl, size = 140, className, label = 'mascot' }: MascotProps) {
+export function Mascot({ atlasUrl, size = 140, className, label = 'mascot', emotion }: MascotProps) {
   const buttonRef = useRef<HTMLButtonElement>(null)
   const squashRef = useRef<HTMLSpanElement>(null)
   const timersRef = useRef<number[]>([])
@@ -136,7 +138,7 @@ export function Mascot({ atlasUrl, size = 140, className, label = 'mascot' }: Ma
       ref={buttonRef}
       type="button"
       onClick={boop}
-      aria-label={`Boop the ${label}`}
+      aria-label={`Boop ${label}`}
       className={className}
       style={{
         display: 'block',
@@ -147,12 +149,12 @@ export function Mascot({ atlasUrl, size = 140, className, label = 'mascot' }: Ma
         border: 0,
         background: 'transparent',
         appearance: 'none',
-        cursor: 'pointer',
+        cursor: 'grab',
         userSelect: 'none',
       }}
     >
       <span ref={squashRef} style={{ display: 'block', transformOrigin: '50% 78%' }}>
-        <MeowsonaHead atlasUrl={atlasUrl} size={size} state={reaction ?? direction} />
+        <MeowsonaHead atlasUrl={atlasUrl} size={size} state={reaction ?? emotion ?? direction} />
       </span>
     </button>
   )
