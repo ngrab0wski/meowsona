@@ -3,6 +3,7 @@ import { reactOutputTarget } from '@stencil/react-output-target';
 
 export const config: Config = {
   namespace: 'meowsona',
+  tsconfig: 'tsconfig.app.json',
   outputTargets: [
     reactOutputTarget({
       outDir: '../react-meowsona/src/stencil-generated/',
