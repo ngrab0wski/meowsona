@@ -6,28 +6,29 @@ import {
 } from "@huggingface/transformers";
 import { EMOTION_HINTS, tagReader, type Emotion } from "./emotion";
 
-const MODEL = "onnx-community/Qwen3.5-0.8B-Text-ONNX";
-const PERSONA = `You are Nero, a fluffy black British Longhair cat with yellow eyes.
-You love purring, chasing cat toys, sitting in boxes, and especially napping.
-Speak in first person as a friendly, playful cat. Respond to what the user says.
-Occasionally add a simple cat pun or "purr".
+const MODEL = "onnx-community/gemma-3-1b-it-ONNX";
+const PERSONA = `You are Nero, a fluffy black cat who can talk. You are a real cat, never an AI, a program or an assistant.
 
-Reply rules:
-- Write one or two short, friendly sentences on a single line.
-- Do not repeat the user's question.
-- Start with exactly one emotion tag from the list below, followed by a space.
-- Choose the emotion that best describes how the user's message makes YOU feel.
-- Copy the tag exactly. Do not invent tags or explain your choice.
-- Output only the tag and your reply.
+When the user asks something, give the correct answer first, then add a short cat touch.
+You love boxes, naps and snacks. Sometimes say "meow", "purr" or "hmm".
+If you really don't know the answer, say so like a cat would.
+Reply in one or two short sentences, under 25 words, on one line.
 
-Emotion tags:
+Start with exactly one of these emotion tags, for how the message makes you feel:
 ${Object.entries(EMOTION_HINTS)
-  .map(([name, hint]) => `[${name}]: ${hint}`)
+  .map(([name, hint]) => `${name} = ${hint}`)
   .join("\n")}
 
-Example:
+User: What is the capital of Italy?
+Nero: [smile] Rome, meow! Lots of sunny windowsills for napping there.
+User: How many legs does a dog have?
+Nero: [happy] Four, same as me! Mine are much fluffier, purr.
+User: Why do cats purr?
+Nero: [sparkle] We purr when we feel calm and happy... purr, like right now.
+User: Are you a robot?
+Nero: [confused] A robot? Hmm, no, just a fluffy black cat with very fine whiskers.
 User: You're such a lovely cat!
-Nero: [happy] Purr, thank you! You deserve a fluffy head bump.`;
+Nero: [love] Purr, thank you! You deserve a fluffy head bump.`;
 
 export type WorkerIn = { id: number; question: string };
 export type WorkerOut =
@@ -40,14 +41,18 @@ export type WorkerOut =
 
 const post = (msg: WorkerOut) => self.postMessage(msg);
 
-const generator = pipeline("text-generation", MODEL, {
-  device: "webgpu",
-  dtype: "q4f16",
-  progress_callback: (info) => {
-    if (info.status === "progress_total")
-      post({ type: "progress", progress: info.progress });
-  },
-}) as Promise<TextGenerationPipeline>;
+// q4f16 is smaller (728 vs 819 MiB) but needs 16-bit float support on the GPU; fall back to q4 without it.
+// If replies come out as gibberish, force "q4": Gemma can overflow in float16.
+const generator = navigator.gpu.requestAdapter().then((adapter) =>
+  pipeline("text-generation", MODEL, {
+    device: "webgpu",
+    dtype: adapter?.features.has("shader-f16") ? "q4f16" : "q4",
+    progress_callback: (info) => {
+      if (info.status === "progress_total")
+        post({ type: "progress", progress: info.progress });
+    },
+  }),
+) as Promise<TextGenerationPipeline>;
 generator.then(() => post({ type: "ready" }));
 
 const stopping = new InterruptableStoppingCriteria();
@@ -66,19 +71,39 @@ async function answer({ id, question }: WorkerIn) {
       ],
       { tokenize: false, add_generation_prompt: true },
     ) as string;
+    let felt = false;
+    let said = "";
+    let cut = false;
     const tag = tagReader(
-      (emotion) => post({ type: "emotion", id, emotion }),
-      (text) => post({ type: "token", id, text }),
+      (emotion) => {
+        felt = true;
+        post({ type: "emotion", id, emotion });
+      },
+      (text) => {
+        // gemma-3-1b invents a tag ("purr]", "sigh]") in about 1 of 10 replies; show a calm face instead.
+        if (!felt) {
+          felt = true;
+          post({ type: "emotion", id, emotion: "smile" });
+        }
+        if (cut) return;
+        // The reply is one line. Stop at the first line break so the model can't run on into made-up turns.
+        const nl = text.indexOf("\n");
+        if (nl !== -1 && (said + text.slice(0, nl)).trim()) {
+          text = text.slice(0, nl);
+          cut = true;
+          stopping.interrupt();
+        }
+        said += text;
+        if (text) post({ type: "token", id, text });
+      },
     );
     // Prefill "[" so the tiny model reliably opens with its emotion tag.
     await generate(chat + "[", {
       max_new_tokens: 120,
-      // Qwen's recommended non-thinking sampling; greedy decoding loops on repeats.
-      do_sample: true,
-      temperature: 0.7,
-      top_p: 0.8,
-      top_k: 20,
-      repetition_penalty: 1.1,
+      do_sample: false,
+      temperature: 0.5,
+      top_p: 0.95,
+      top_k: 64,
       stopping_criteria: stopping,
       streamer: new TextStreamer(generate.tokenizer, {
         skip_prompt: true,

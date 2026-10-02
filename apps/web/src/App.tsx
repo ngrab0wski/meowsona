@@ -40,7 +40,7 @@ const PROMPTS = [
   ["Cardboard boxes", "What do you think about cardboard boxes?"],
 ] as const;
 
-const HELLO_PROMPT = "Hello Nero!";
+const HELLO_PROMPT = "Hello. How are you today?";
 
 function App() {
   const [text, setText] = useState("");
@@ -339,10 +339,10 @@ function App() {
                 Nero is a playful way to explore what small, local language
                 models can do. His replies are generated on your device with{" "}
                 <a
-                  href="https://huggingface.co/Qwen/Qwen3.5-0.8B"
+                  href="https://huggingface.co/onnx-community/gemma-3-1b-it-ONNX"
                   className="font-semibold text-foreground"
                 >
-                  Qwen3.5-0.8B
+                  Gemma 3 1B
                 </a>{" "}
                 and WebGPU — not sent off to a chat server.
               </p>
