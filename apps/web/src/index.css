@@ -38,8 +38,9 @@
   --primary-foreground: #332814;
   --muted: #eee8dd;
   --muted-foreground: #6c625a;
-  --faint: #9a8c7f;
+  --faint: #7d6f63;
   --ornament: #b08658;
+  --ring: #7a5a2e;
   --accent: #eee8dd;
   --accent-foreground: #292421;
   --destructive: #c2410c;
@@ -93,22 +94,22 @@
   :focus-visible {
     @apply outline-2 outline-offset-3 outline-ring;
   }
-
-  .serif-accent {
-    @apply font-serif font-normal tracking-[-.065em] text-primary;
+  input,
+  textarea {
+    caret-color: var(--ring);
+  }
+  :root {
+    accent-color: var(--primary);
+    scrollbar-color: color-mix(in srgb, var(--foreground) 30%, transparent)
+      transparent;
+  }
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
   }
 }
 
 @layer components {
-  /* Small uppercase mono label: header tagline, section kickers, status, footer. */
-  .eyebrow {
-    font-family: var(--font-heading);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
   .stack {
     @apply grid place-items-center;
     grid-template-areas: "stack";

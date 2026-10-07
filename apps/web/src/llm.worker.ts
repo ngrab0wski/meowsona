@@ -34,6 +34,8 @@ export type WorkerIn = { id: number; question: string };
 export type WorkerOut =
   | { type: "progress"; progress: number }
   | { type: "ready" }
+  | { type: "unsupported" }
+  | { type: "load-error"; message: string }
   | { type: "token"; id: number; text: string }
   | { type: "emotion"; id: number; emotion: Emotion }
   | { type: "done"; id: number }
@@ -43,17 +45,31 @@ const post = (msg: WorkerOut) => self.postMessage(msg);
 
 // q4f16 is smaller (728 vs 819 MiB) but needs 16-bit float support on the GPU; fall back to q4 without it.
 // If replies come out as gibberish, force "q4": Gemma can overflow in float16.
-const generator = navigator.gpu.requestAdapter().then((adapter) =>
-  pipeline("text-generation", MODEL, {
+const generator = (async () => {
+  // `navigator.gpu` can exist without a usable adapter (blocklisted GPU, Linux Chrome, some Safari builds).
+  // Check before downloading ~730 MB that could never run.
+  const adapter = await navigator.gpu?.requestAdapter();
+  if (!adapter) {
+    post({ type: "unsupported" });
+    return new Promise<never>(() => {});
+  }
+  return pipeline("text-generation", MODEL, {
     device: "webgpu",
-    dtype: adapter?.features.has("shader-f16") ? "q4f16" : "q4",
+    dtype: adapter.features.has("shader-f16") ? "q4f16" : "q4",
     progress_callback: (info) => {
       if (info.status === "progress_total")
         post({ type: "progress", progress: info.progress });
     },
-  }),
-) as Promise<TextGenerationPipeline>;
-generator.then(() => post({ type: "ready" }));
+  }) as Promise<TextGenerationPipeline>;
+})();
+generator.then(
+  () => post({ type: "ready" }),
+  (e) =>
+    post({
+      type: "load-error",
+      message: e instanceof Error ? e.message : String(e),
+    }),
+);
 
 const stopping = new InterruptableStoppingCriteria();
 let queue = Promise.resolve();
